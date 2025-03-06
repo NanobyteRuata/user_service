@@ -12,7 +12,7 @@ export class Auth {
   @PrimaryGeneratedColumn()
   id: number;
 
-  @OneToOne(() => User, (user) => user.auth)
+  @OneToOne(() => User, (user) => user.auth, { cascade: ['insert'] })
   @JoinColumn({ name: 'user_id' })
   user: User;
 

@@ -15,4 +15,8 @@ export class RegisterDto {
   @IsNotEmpty()
   @Length(8)
   password: string;
+
+  @IsString()
+  @IsNotEmpty()
+  deviceId: string;
 }

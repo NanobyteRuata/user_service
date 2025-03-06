@@ -1,74 +1,133 @@
 import {
   BadRequestException,
-  HttpException,
-  HttpStatus,
   Injectable,
-  InternalServerErrorException,
   UnauthorizedException,
 } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
-import { UsersService } from 'src/users/users.service';
 import * as bcrypt from 'bcrypt';
 import { User } from 'src/users/user.entity';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Auth } from './auth.entity';
 import { Repository } from 'typeorm';
-import { RegisterDto } from 'src/dto/auth/register.dto';
-import { LoginDto } from 'src/dto/auth/login.dto';
+import { RegisterDto } from 'src/auth/dtos/register.dto';
+import { LoginDto } from 'src/auth/dtos/login.dto';
+import { LoginResponse } from 'src/auth/dtos/login-response.dto';
+import { ConfigService } from '@nestjs/config';
+import { JwtPayloadUser } from './models/jwt-payload-user.model';
+import { SessionsService } from 'src/sessions/sessions.service';
+import { RefreshDto } from 'src/auth/dtos/refresh.dto';
+import { Tokens } from './models/tokens.model';
 
 @Injectable()
 export class AuthService {
   constructor(
     @InjectRepository(Auth)
     private readonly authRepository: Repository<Auth>,
-    private usersService: UsersService,
     private jwtService: JwtService,
+    private configService: ConfigService,
+    private sessionsService: SessionsService,
   ) {}
 
-  async register({ email, name, password }: RegisterDto): Promise<User | null> {
-    let user = await this.usersService.findByEmail(email);
-    if (user) throw new HttpException('User with email already exists', HttpStatus.BAD_REQUEST);
+  private async validateUser(email: string, password: string): Promise<User> {
+    const auth = await this.authRepository.findOne({
+      where: { user: { email } },
+      relations: ['user'],
+    });
+    if (!auth || !auth.user.isActive)
+      throw new UnauthorizedException('Email or password incorrect');
 
-    user = await this.usersService.create({ email, name });
+    const isMatch = await bcrypt.compare(password, auth.password);
+    if (!isMatch)
+      throw new UnauthorizedException('Email or password incorrect');
 
-    const saltRounds = 10;
-    const hashedPassword = await bcrypt.hash(password, saltRounds);
+    return auth.user;
+  }
+
+  private async verifyRefreshToken(refreshToken: string): Promise<boolean> {
+    try {
+      await this.jwtService.verifyAsync(refreshToken, {
+        secret: this.configService.get<string>('JWT_REFRESH_SECRET'),
+      });
+      return true;
+    } catch {
+      return false;
+    }
+  }
+
+  private async generateTokens(id: number, email: string): Promise<Tokens> {
+    const payload: JwtPayloadUser = {
+      id,
+      email,
+    };
+
+    const sign = (secretKey: string, expiresInKey: string): Promise<string> => {
+      return this.jwtService.signAsync(payload, {
+        secret: this.configService.get<string>(secretKey),
+        expiresIn: this.configService.get<string>(expiresInKey),
+      });
+    };
+
+    const accessToken = await sign('JWT_ACCESS_SECRET', 'JWT_ACCESS_EXPIRE_IN');
+    const refreshToken = await sign(
+      'JWT_REFRESH_SECRET',
+      'JWT_REFRESH_EXPIRE_IN',
+    );
+
+    return {
+      accessToken,
+      refreshToken,
+    };
+  }
+
+  async register({ email, name, password }: RegisterDto): Promise<User> {
+    const userExists = await this.authRepository.findOne({
+      where: { user: { email } },
+      relations: ['user'],
+    });
+    if (userExists)
+      throw new BadRequestException('User with email already exists');
+
+    const hashedPassword = await bcrypt.hash(password, 10);
 
     const auth = this.authRepository.create({
-      user,
+      user: { email, name },
       password: hashedPassword,
     });
-
     await this.authRepository.save(auth);
     return auth.user;
   }
 
-  async login({
-    email,
-    password,
-  }: LoginDto): Promise<{ access_token: string; user: User } | null> {
-    const user = await this.usersService.findByEmail(email, ['auth']);
-    if (!user) {
-      throw new UnauthorizedException();
-    }
+  async login({ email, password, deviceId }: LoginDto): Promise<LoginResponse> {
+    const user = await this.validateUser(email, password);
 
-    const isMatch = await bcrypt.compare(password, user.auth!.password);
-    if (!isMatch) {
-      throw new UnauthorizedException();
-    }
+    const tokens = await this.generateTokens(user.id, user.email);
 
-    const jwtPayload = { sub: user.id, email: user.email };
-    const access_token = await this.jwtService.signAsync(jwtPayload);
+    await this.sessionsService.upsert(user.id, tokens.refreshToken, deviceId);
 
-    delete user.auth;
-
-    return {
-      access_token,
-      user,
-    };
+    return { tokens, user };
   }
 
-  findOne(user: User): Promise<Auth | null> {
-    return this.authRepository.findOneBy({ user });
+  async refresh(
+    userId: number,
+    userEmail: string,
+    { deviceId, refreshToken }: RefreshDto,
+  ): Promise<Tokens | null> {
+    const isRefreshTokenValid = await this.verifyRefreshToken(refreshToken);
+    if (!isRefreshTokenValid)
+      throw new UnauthorizedException('Session has expired');
+
+    const tokens = await this.generateTokens(userId, userEmail);
+    await this.sessionsService.upsert(userId, tokens.refreshToken, deviceId);
+
+    return tokens;
+  }
+
+  async logout(
+    userId: number,
+    { refreshToken, deviceId }: RefreshDto,
+  ): Promise<boolean> {
+    const now = new Date();
+    await this.sessionsService.upsert(userId, refreshToken, deviceId, now);
+    return true;
   }
 }
