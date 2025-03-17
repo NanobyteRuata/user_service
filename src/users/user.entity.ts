@@ -19,10 +19,10 @@ export class User {
   @Column({ nullable: false, unique: true })
   email: string;
 
-  @OneToOne(() => Auth, (auth) => auth.user, { cascade: ['remove'] })
+  @OneToOne(() => Auth, (auth) => auth.user)
   auth?: Auth;
 
-  @OneToMany(() => Session, (session) => session.user, { cascade: ['remove'] })
+  @OneToMany(() => Session, (session) => session.user)
   sessions: Session[];
 
   @Column('boolean', { default: true })

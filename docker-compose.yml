@@ -4,11 +4,11 @@ services:
     image: postgres:13
     container_name: rexpense_pg_db
     ports:
-      - '5432:5432'
+      - '${DB_PORT}:5432'
     environment:
-      POSTGRES_DB: rexpense
-      POSTGRES_USER: rexpense
-      POSTGRES_PASSWORD: rexpense
+      POSTGRES_DB: ${DB_DATABASE}
+      POSTGRES_USER: ${DB_USERNAME}
+      POSTGRES_PASSWORD: ${DB_PASSWORD}
     volumes:
       - postgres_data:/var/lib/postgresql/data
 volumes:

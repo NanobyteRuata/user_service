@@ -14,7 +14,10 @@ export class Session {
   @PrimaryGeneratedColumn()
   id: number;
 
-  @ManyToOne(() => User, (user) => user.auth)
+  @ManyToOne(() => User, (user) => user.auth, {
+    cascade: true,
+    onDelete: 'CASCADE',
+  })
   @JoinColumn({ name: 'user_id' })
   user: User;
 
