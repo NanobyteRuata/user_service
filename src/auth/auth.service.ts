@@ -11,12 +11,13 @@ import { Auth } from './auth.entity';
 import { Repository } from 'typeorm';
 import { RegisterDto } from 'src/auth/dtos/register.dto';
 import { LoginDto } from 'src/auth/dtos/login.dto';
-import { LoginResponse } from 'src/auth/dtos/login-response.dto';
 import { ConfigService } from '@nestjs/config';
 import { JwtPayloadUser } from './models/jwt-payload-user.model';
 import { SessionsService } from 'src/sessions/sessions.service';
 import { RefreshDto } from 'src/auth/dtos/refresh.dto';
 import { Tokens } from './models/tokens.model';
+import { ResponseFormat } from 'src/common/dto/response-format.dto';
+import { LogoutDto } from './dtos/logout.dto';
 
 @Injectable()
 export class AuthService {
@@ -45,10 +46,30 @@ export class AuthService {
 
   private async verifyRefreshToken(refreshToken: string): Promise<boolean> {
     try {
-      await this.jwtService.verifyAsync(refreshToken, {
-        secret: this.configService.get<string>('JWT_REFRESH_SECRET'),
-      });
-      return true;
+      // Verify JWT and extract user ID
+      const { id }: JwtPayloadUser = await this.jwtService.verifyAsync(
+        refreshToken,
+        {
+          secret: this.configService.get<string>('JWT_REFRESH_SECRET'),
+        },
+      );
+
+      // Fetch active sessions for the user
+      const sessions = await this.sessionsService.findByUserId(id);
+
+      // Check if the refresh token matches any valid session
+      const isValid = (
+        await Promise.all(
+          sessions.map(
+            async (session) =>
+              session.refreshToken &&
+              (await bcrypt.compare(refreshToken, session.refreshToken)) &&
+              session.expiresAt.getTime() > Date.now(),
+          ),
+        )
+      ).some(Boolean);
+
+      return isValid;
     } catch {
       return false;
     }
@@ -79,7 +100,11 @@ export class AuthService {
     };
   }
 
-  async register({ email, name, password }: RegisterDto): Promise<User> {
+  async register({
+    email,
+    name,
+    password,
+  }: RegisterDto): Promise<ResponseFormat> {
     const userExists = await this.authRepository.findOne({
       where: { user: { email } },
       relations: ['user'],
@@ -94,24 +119,33 @@ export class AuthService {
       password: hashedPassword,
     });
     await this.authRepository.save(auth);
-    return auth.user;
+    return new ResponseFormat({
+      message: 'Registered successfully!',
+      data: auth.user,
+    });
   }
 
-  async login({ email, password, deviceId }: LoginDto): Promise<LoginResponse> {
+  async login({
+    email,
+    password,
+    deviceId,
+  }: LoginDto): Promise<ResponseFormat> {
     const user = await this.validateUser(email, password);
 
     const tokens = await this.generateTokens(user.id, user.email);
-
     await this.sessionsService.upsert(user.id, tokens.refreshToken, deviceId);
 
-    return { tokens, user };
+    return new ResponseFormat({
+      message: 'Logged in successfully!',
+      data: { tokens, user },
+    });
   }
 
   async refresh(
     userId: number,
     userEmail: string,
     { deviceId, refreshToken }: RefreshDto,
-  ): Promise<Tokens | null> {
+  ): Promise<ResponseFormat> {
     const isRefreshTokenValid = await this.verifyRefreshToken(refreshToken);
     if (!isRefreshTokenValid)
       throw new UnauthorizedException('Session has expired');
@@ -119,15 +153,19 @@ export class AuthService {
     const tokens = await this.generateTokens(userId, userEmail);
     await this.sessionsService.upsert(userId, tokens.refreshToken, deviceId);
 
-    return tokens;
+    return new ResponseFormat({
+      message: 'Tokens refreshed successfully!',
+      data: tokens,
+    });
   }
 
   async logout(
     userId: number,
-    { refreshToken, deviceId }: RefreshDto,
-  ): Promise<boolean> {
-    const now = new Date();
-    await this.sessionsService.upsert(userId, refreshToken, deviceId, now);
-    return true;
+    { deviceId }: LogoutDto,
+  ): Promise<ResponseFormat> {
+    await this.sessionsService.delete(userId, deviceId);
+    return new ResponseFormat({
+      message: 'Logged out successfully!',
+    });
   }
 }
