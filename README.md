@@ -1,4 +1,4 @@
-# Rexpense Server
+# User Service
 ### Tools used
 - NestJS Framework
 	1. @nestjs/schedule for running CRON jobs to cleanup expired refreshTokens
