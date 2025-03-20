@@ -25,6 +25,9 @@ export class User {
   @OneToMany(() => Session, (session) => session.user)
   sessions: Session[];
 
+  @Column('boolean', { default: false })
+  isAdmin: boolean;
+
   @Column('boolean', { default: true })
   isActive: boolean;
 

@@ -1,33 +1,54 @@
-import { Body, Controller, Delete, Get, Param, Patch } from '@nestjs/common';
+import {
+  Body,
+  Controller,
+  Delete,
+  Get,
+  Param,
+  Patch,
+  Query,
+} from '@nestjs/common';
 import { UsersService } from './users.service';
 import { UpdateUserDto } from 'src/users/dtos/update-user.dto';
-import { Self } from 'src/auth/auth.constant';
+import { Admin, Self } from 'src/auth/auth.constant';
 
 @Controller('users')
 export class UsersController {
   constructor(private usersService: UsersService) {}
 
-  @Self()
-  @Get(':id')
-  findOne(@Param('id') id: number) {
-    return this.usersService.findOne(id);
+  @Admin()
+  @Get('')
+  findAll(
+    @Query('page') page: number = 1,
+    @Query('limit') limit: number = 10,
+    @Query('isActive') isActive?: boolean,
+  ) {
+    return this.usersService.findAll({ page, limit }, { isActive });
   }
 
+  @Admin()
   @Self()
-  @Patch(':id')
-  update(@Param('id') id: number, @Body() payload: UpdateUserDto) {
-    return this.usersService.update(id, payload);
+  @Get(':userId')
+  findOne(@Param('userId') userId: number) {
+    return this.usersService.findOne(userId);
   }
 
+  @Admin()
   @Self()
-  @Delete(':id')
-  deactivate(@Param('id') id: number) {
-    return this.usersService.deactivate(id);
+  @Patch(':userId')
+  update(@Param('userId') userId: number, @Body() payload: UpdateUserDto) {
+    return this.usersService.update(userId, payload);
   }
 
+  @Admin()
   @Self()
-  @Delete(':id/hard-delete')
-  delete(@Param('id') id: number) {
-    return this.usersService.delete(id);
+  @Delete(':userId')
+  deactivate(@Param('userId') userId: number) {
+    return this.usersService.deactivate(userId);
+  }
+
+  @Admin()
+  @Delete(':userId/hard-delete')
+  delete(@Param('userId') userId: number) {
+    return this.usersService.delete(userId);
   }
 }

@@ -2,8 +2,6 @@ import {
   BadRequestException,
   Body,
   Controller,
-  HttpCode,
-  HttpStatus,
   Post,
   Req,
 } from '@nestjs/common';
@@ -19,30 +17,26 @@ export class AuthController {
   constructor(private authService: AuthService) {}
 
   @Public()
-  @HttpCode(HttpStatus.CREATED)
   @Post('register')
   register(@Body() payload: RegisterDto) {
     return this.authService.register(payload);
   }
 
   @Public()
-  @HttpCode(HttpStatus.OK)
   @Post('login')
   login(@Body() payload: LoginDto) {
     return this.authService.login(payload);
   }
 
-  @HttpCode(HttpStatus.OK)
   @Post('logout')
   logout(@Req() req: Request, @Body() payload: RefreshDto) {
     if (!req.user) throw new BadRequestException();
     return this.authService.logout(req.user['id'], payload);
   }
 
-  @HttpCode(HttpStatus.OK)
   @Post('refresh')
-  refresh(@Req() req: Request, @Body() payload: RefreshDto) {
-    if (!req.user) throw new BadRequestException();
-    return this.authService.refresh(req.user['id'], req.user['email'], payload);
+  @Public()
+  refresh(@Body() payload: RefreshDto) {
+    return this.authService.refresh(payload);
   }
 }

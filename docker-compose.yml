@@ -2,7 +2,7 @@ version: '3.7'
 services:
   postgres:
     image: postgres:13
-    container_name: rexpense_pg_db
+    container_name: user_service_pg_db
     ports:
       - '${DB_PORT}:5432'
     environment:

@@ -1,8 +1,4 @@
-import {
-  BadRequestException,
-  Injectable,
-  UnauthorizedException,
-} from '@nestjs/common';
+import { Injectable } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import * as bcrypt from 'bcrypt';
 import { User } from 'src/users/user.entity';
@@ -16,8 +12,11 @@ import { JwtPayloadUser } from './models/jwt-payload-user.model';
 import { SessionsService } from 'src/sessions/sessions.service';
 import { RefreshDto } from 'src/auth/dtos/refresh.dto';
 import { Tokens } from './models/tokens.model';
-import { ResponseFormat } from 'src/common/dto/response-format.dto';
+import { ResponseFormat } from 'src/common/model/response-format.model';
 import { LogoutDto } from './dtos/logout.dto';
+import { UserAlreadyExistsException } from 'src/core/exceptions/user-exceptions';
+import { WrongCredentialsException } from 'src/core/exceptions/auth-exceptions';
+import { SessionNotFoundException } from 'src/core/exceptions/session-exceptions';
 
 @Injectable()
 export class AuthService {
@@ -34,51 +33,48 @@ export class AuthService {
       where: { user: { email } },
       relations: ['user'],
     });
-    if (!auth || !auth.user.isActive)
-      throw new UnauthorizedException('Email or password incorrect');
+    if (!auth || !auth.user.isActive) throw new WrongCredentialsException();
 
     const isMatch = await bcrypt.compare(password, auth.password);
-    if (!isMatch)
-      throw new UnauthorizedException('Email or password incorrect');
+    if (!isMatch) throw new WrongCredentialsException();
 
     return auth.user;
   }
 
-  private async verifyRefreshToken(refreshToken: string): Promise<boolean> {
+  private async verifyRefreshToken(
+    refreshToken: string,
+    deviceId: string,
+  ): Promise<JwtPayloadUser | null> {
     try {
       // Verify JWT and extract user ID
-      const { id }: JwtPayloadUser = await this.jwtService.verifyAsync(
+      const user: JwtPayloadUser = await this.jwtService.verifyAsync(
         refreshToken,
         {
           secret: this.configService.get<string>('JWT_REFRESH_SECRET'),
         },
       );
 
-      // Fetch active sessions for the user
-      const sessions = await this.sessionsService.findByUserId(id);
+      const session = await this.sessionsService.getSession(user.id, deviceId);
+      if (!session || !session.refreshToken) return null;
 
-      // Check if the refresh token matches any valid session
-      const isValid = (
-        await Promise.all(
-          sessions.map(
-            async (session) =>
-              session.refreshToken &&
-              (await bcrypt.compare(refreshToken, session.refreshToken)) &&
-              session.expiresAt.getTime() > Date.now(),
-          ),
-        )
-      ).some(Boolean);
+      const isMatch = await bcrypt.compare(refreshToken, session.refreshToken);
+      if (!isMatch) return null;
 
-      return isValid;
+      return user;
     } catch {
-      return false;
+      return null;
     }
   }
 
-  private async generateTokens(id: number, email: string): Promise<Tokens> {
+  private async generateTokens(
+    id: number,
+    email: string,
+    isAdmin: boolean = false,
+  ): Promise<Tokens> {
     const payload: JwtPayloadUser = {
       id,
       email,
+      isAdmin,
     };
 
     const sign = (secretKey: string, expiresInKey: string): Promise<string> => {
@@ -109,8 +105,7 @@ export class AuthService {
       where: { user: { email } },
       relations: ['user'],
     });
-    if (userExists)
-      throw new BadRequestException('User with email already exists');
+    if (userExists) throw new UserAlreadyExistsException(email);
 
     const hashedPassword = await bcrypt.hash(password, 10);
 
@@ -132,7 +127,7 @@ export class AuthService {
   }: LoginDto): Promise<ResponseFormat> {
     const user = await this.validateUser(email, password);
 
-    const tokens = await this.generateTokens(user.id, user.email);
+    const tokens = await this.generateTokens(user.id, user.email, user.isAdmin);
     await this.sessionsService.upsert(user.id, tokens.refreshToken, deviceId);
 
     return new ResponseFormat({
@@ -141,17 +136,15 @@ export class AuthService {
     });
   }
 
-  async refresh(
-    userId: number,
-    userEmail: string,
-    { deviceId, refreshToken }: RefreshDto,
-  ): Promise<ResponseFormat> {
-    const isRefreshTokenValid = await this.verifyRefreshToken(refreshToken);
-    if (!isRefreshTokenValid)
-      throw new UnauthorizedException('Session has expired');
+  async refresh({
+    deviceId,
+    refreshToken,
+  }: RefreshDto): Promise<ResponseFormat> {
+    const user = await this.verifyRefreshToken(refreshToken, deviceId);
+    if (!user) throw new SessionNotFoundException();
 
-    const tokens = await this.generateTokens(userId, userEmail);
-    await this.sessionsService.upsert(userId, tokens.refreshToken, deviceId);
+    const tokens = await this.generateTokens(user.id, user.email, user.isAdmin);
+    await this.sessionsService.upsert(user.id, tokens.refreshToken, deviceId);
 
     return new ResponseFormat({
       message: 'Tokens refreshed successfully!',
