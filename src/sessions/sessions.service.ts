@@ -4,9 +4,9 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { DeleteResult, In, Repository } from 'typeorm';
 import { ConfigService } from '@nestjs/config';
 import { toMs } from 'ms-typescript';
-import * as bcrypt from 'bcrypt';
 import { IPaginationOptions, paginate } from 'nestjs-typeorm-paginate';
 import { ResponseFormat } from 'src/common/model/response-format.model';
+import { SessionDto } from './dtos/responses/session.dto';
 
 @Injectable()
 export class SessionsService {
@@ -41,10 +41,13 @@ export class SessionsService {
       options,
     );
 
+    // exclude refreshTokens for security reasons
+    const sessionDtos = items.map((session) => new SessionDto(session));
+
     return new ResponseFormat({
       status: 'success',
       message: 'Sessions fetched successfully',
-      data: items,
+      data: sessionDtos,
       pagination: meta,
     });
   }
@@ -56,24 +59,26 @@ export class SessionsService {
     const { items, meta } = await paginate<Session>(
       this.sessionRepository,
       options,
-      { user: { id } },
+      { where: { user: { id } } },
     );
+
+    // exclude refreshTokens for security reasons
+    const sessionDtos = items.map((session) => new SessionDto(session));
 
     return new ResponseFormat({
       status: 'success',
       message: 'Sessions fetched successfully',
-      data: items,
+      data: sessionDtos,
       pagination: meta,
     });
   }
 
   async upsert(
     userId: number,
-    refreshToken: string,
+    hashedRefreshToken: string,
     deviceId: string,
     expiresAt = this.getNewTokenExpiresAt(),
   ): Promise<Session | null> {
-    const hashedRefreshToken = await bcrypt.hash(refreshToken, 10);
     await this.sessionRepository.upsert(
       {
         user: { id: userId },
@@ -103,6 +108,17 @@ export class SessionsService {
     return await this.sessionRepository.delete({
       user: { id: userId },
       deviceId,
+    });
+  }
+
+  async endSession(
+    userId: number,
+    deviceId: string | string[],
+  ): Promise<ResponseFormat> {
+    await this.delete(userId, deviceId);
+    return new ResponseFormat({
+      status: 'success',
+      message: 'Sessions ended successfully',
     });
   }
 }

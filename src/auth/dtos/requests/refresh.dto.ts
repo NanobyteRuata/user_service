@@ -4,8 +4,4 @@ export class RefreshDto {
   @IsString()
   @IsNotEmpty()
   refreshToken: string;
-
-  @IsString()
-  @IsNotEmpty()
-  deviceId: string;
 }

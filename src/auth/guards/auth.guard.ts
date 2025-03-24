@@ -42,7 +42,12 @@ export class AuthGuard implements CanActivate {
     if (user.isAdmin) return true;
 
     const isSelfEndpoint = this.isGuarded(context, IS_SELF_KEY);
-    const targetUserId = Number(request.params.userId ?? request.body.userId);
+    const targetUserId = Number(
+      request.params.userId ??
+        request.body?.userId ??
+        request.query.userId ??
+        0,
+    );
     if (isSelfEndpoint && targetUserId === user.id) {
       return true;
     }
@@ -70,6 +75,7 @@ export class AuthGuard implements CanActivate {
       // Check authorization of logged in user
       return this.authorize(context, request, user);
     } catch (error) {
+      console.error('canActivateError:', error);
       throw new UnauthorizedUserException();
     }
   }

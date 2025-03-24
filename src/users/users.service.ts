@@ -2,7 +2,7 @@ import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { User } from './user.entity';
-import { UpdateUserDto } from 'src/users/dtos/update-user.dto';
+import { UpdateUserDto } from 'src/users/dtos/requests/update-user.dto';
 import { UserNotFoundException } from 'src/core/exceptions/user-exceptions';
 import { ResponseFormat } from 'src/common/model/response-format.model';
 import { IPaginationOptions } from 'nestjs-typeorm-paginate';
@@ -15,15 +15,13 @@ export class UsersService {
     private readonly userRepository: Repository<User>,
   ) {}
 
-  async findAll(
+  async findAllUsers(
     options: IPaginationOptions,
     filters?: { isActive?: boolean },
   ): Promise<ResponseFormat> {
-    const { items, meta } = await paginate<User>(
-      this.userRepository,
-      options,
-      filters,
-    );
+    const { items, meta } = await paginate<User>(this.userRepository, options, {
+      where: filters,
+    });
     return new ResponseFormat({
       status: 'success',
       message: 'Users fetched successfully',
@@ -32,11 +30,8 @@ export class UsersService {
     });
   }
 
-  async findOne(id: number, relations?: string[]): Promise<ResponseFormat> {
-    const user = await this.userRepository.findOne({
-      where: { id },
-      relations,
-    });
+  async findUserById(id: number): Promise<ResponseFormat> {
+    const user = await this.userRepository.findOneBy({ id });
     if (!user) throw new UserNotFoundException(id);
     return new ResponseFormat({
       status: 'success',
@@ -45,11 +40,11 @@ export class UsersService {
     });
   }
 
-  async update(
+  async updateUser(
     id: number,
     updateUserDto: UpdateUserDto,
   ): Promise<ResponseFormat> {
-    const user = await this.findOne(id);
+    const user = await this.findUserById(id);
     if (!user) {
       throw new UserNotFoundException(id);
     }
@@ -59,29 +54,27 @@ export class UsersService {
       updatedAt: new Date(),
     });
 
-    return new ResponseFormat({
-      status: 'success',
-      message: 'User updated successfully',
-      data: await this.findOne(id),
-    });
+    const response = await this.findUserById(id);
+    response.message = 'User updated successfully';
+    return response;
   }
 
-  async deactivate(id: number): Promise<ResponseFormat> {
-    const response = await this.update(id, { isActive: false });
+  async deactivateUser(id: number): Promise<ResponseFormat> {
+    const response = await this.updateUser(id, { isActive: false });
     response.message = 'User deactivated successfully';
     return response;
   }
 
-  async delete(id: number): Promise<ResponseFormat> {
-    const user = await this.findOne(id);
-    if (!user) throw new UserNotFoundException(id);
+  async deleteUser(id: number): Promise<ResponseFormat> {
+    const { data } = await this.findUserById(id);
+    if (!data) throw new UserNotFoundException(id);
 
     await this.userRepository.delete(id);
 
     return new ResponseFormat({
       status: 'success',
       message: 'User deleted successfully',
-      data: user,
+      data,
     });
   }
 }

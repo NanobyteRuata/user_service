@@ -13,7 +13,6 @@ async function bootstrap() {
     .setTitle('User Service API')
     .setDescription('User management API for RExpense microservices')
     .setVersion('1.0')
-    .addTag('users')
     .addBearerAuth()
     .build();
   const document = SwaggerModule.createDocument(app, swaggerConfig);

@@ -1,9 +1,9 @@
 import { IPaginationMeta } from 'nestjs-typeorm-paginate';
 
-export class ResponseFormat {
+export class ResponseFormat<T = object> {
   status: 'success' | 'error';
   message: string;
-  data?: object;
+  data?: T;
   error?: object;
   pagination?: IPaginationMeta;
 
@@ -13,7 +13,7 @@ export class ResponseFormat {
     data,
     error,
     pagination,
-  }: Partial<ResponseFormat>) {
+  }: Partial<ResponseFormat<T>>) {
     this.status = status ?? 'success';
     this.message =
       message ?? (error ? 'Server error' : 'Request completed successfully');

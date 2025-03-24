@@ -11,4 +11,4 @@
 	2. BCrypt
 - Third-Party
 	1. nestjs-typeorm-paginate for pagination
-	
+	2. Swagger for API documentation

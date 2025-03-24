@@ -5,18 +5,19 @@ import { User } from 'src/users/user.entity';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Auth } from './auth.entity';
 import { Repository } from 'typeorm';
-import { RegisterDto } from 'src/auth/dtos/register.dto';
-import { LoginDto } from 'src/auth/dtos/login.dto';
+import { RegisterDto } from 'src/auth/dtos/requests/register.dto';
+import { LoginDto } from 'src/auth/dtos/requests/login.dto';
 import { ConfigService } from '@nestjs/config';
 import { JwtPayloadUser } from './models/jwt-payload-user.model';
 import { SessionsService } from 'src/sessions/sessions.service';
-import { RefreshDto } from 'src/auth/dtos/refresh.dto';
+import { RefreshDto } from 'src/auth/dtos/requests/refresh.dto';
 import { Tokens } from './models/tokens.model';
 import { ResponseFormat } from 'src/common/model/response-format.model';
-import { LogoutDto } from './dtos/logout.dto';
+import { LogoutDto } from './dtos/requests/logout.dto';
 import { UserAlreadyExistsException } from 'src/core/exceptions/user-exceptions';
 import { WrongCredentialsException } from 'src/core/exceptions/auth-exceptions';
 import { SessionNotFoundException } from 'src/core/exceptions/session-exceptions';
+import { v4 as uuidv4 } from 'uuid';
 
 @Injectable()
 export class AuthService {
@@ -43,16 +44,17 @@ export class AuthService {
 
   private async verifyRefreshToken(
     refreshToken: string,
-    deviceId: string,
   ): Promise<JwtPayloadUser | null> {
     try {
       // Verify JWT and extract user ID
-      const user: JwtPayloadUser = await this.jwtService.verifyAsync(
+      const payload: JwtPayloadUser = await this.jwtService.verifyAsync(
         refreshToken,
         {
           secret: this.configService.get<string>('JWT_REFRESH_SECRET'),
         },
       );
+      const { deviceId, ...user } = payload;
+      if (!deviceId) return null;
 
       const session = await this.sessionsService.getSession(user.id, deviceId);
       if (!session || !session.refreshToken) return null;
@@ -60,35 +62,35 @@ export class AuthService {
       const isMatch = await bcrypt.compare(refreshToken, session.refreshToken);
       if (!isMatch) return null;
 
-      return user;
+      return payload;
     } catch {
       return null;
     }
   }
 
   private async generateTokens(
-    id: number,
-    email: string,
-    isAdmin: boolean = false,
+    { id, email, isAdmin }: User | JwtPayloadUser,
+    deviceId: string,
   ): Promise<Tokens> {
-    const payload: JwtPayloadUser = {
+    const accessPayload: JwtPayloadUser = {
       id,
       email,
       isAdmin,
     };
-
-    const sign = (secretKey: string, expiresInKey: string): Promise<string> => {
-      return this.jwtService.signAsync(payload, {
-        secret: this.configService.get<string>(secretKey),
-        expiresIn: this.configService.get<string>(expiresInKey),
-      });
+    const refreshPayload = {
+      ...accessPayload,
+      deviceId, // Include deviceId in refresh token only
     };
 
-    const accessToken = await sign('JWT_ACCESS_SECRET', 'JWT_ACCESS_EXPIRE_IN');
-    const refreshToken = await sign(
-      'JWT_REFRESH_SECRET',
-      'JWT_REFRESH_EXPIRE_IN',
-    );
+    const accessToken = await this.jwtService.signAsync(accessPayload, {
+      secret: this.configService.get<string>('JWT_ACCESS_SECRET'),
+      expiresIn: this.configService.get<string>('JWT_ACCESS_EXPIRE_IN'),
+    });
+
+    const refreshToken = await this.jwtService.signAsync(refreshPayload, {
+      secret: this.configService.get<string>('JWT_REFRESH_SECRET'),
+      expiresIn: this.configService.get<string>('JWT_REFRESH_EXPIRE_IN'),
+    });
 
     return {
       accessToken,
@@ -96,11 +98,23 @@ export class AuthService {
     };
   }
 
-  async register({
-    email,
-    name,
-    password,
-  }: RegisterDto): Promise<ResponseFormat> {
+  private async generateTokensAndUpsertSession(
+    user: JwtPayloadUser,
+    deviceId: string,
+    message: string,
+  ): Promise<ResponseFormat> {
+    const tokens = await this.generateTokens(user, deviceId);
+    const hashedRefreshToken = await bcrypt.hash(tokens.refreshToken, 10);
+    await this.sessionsService.upsert(user.id, hashedRefreshToken, deviceId);
+
+    return new ResponseFormat({
+      message,
+      data: tokens,
+    });
+  }
+
+  async register({ password, ...user }: RegisterDto): Promise<ResponseFormat> {
+    const { email } = user;
     const userExists = await this.authRepository.findOne({
       where: { user: { email } },
       relations: ['user'],
@@ -109,8 +123,9 @@ export class AuthService {
 
     const hashedPassword = await bcrypt.hash(password, 10);
 
+    // this creates user and auth at the same time
     const auth = this.authRepository.create({
-      user: { email, name },
+      user,
       password: hashedPassword,
     });
     await this.authRepository.save(auth);
@@ -126,37 +141,31 @@ export class AuthService {
     deviceId,
   }: LoginDto): Promise<ResponseFormat> {
     const user = await this.validateUser(email, password);
+    if (!deviceId) deviceId = uuidv4();
 
-    const tokens = await this.generateTokens(user.id, user.email, user.isAdmin);
-    await this.sessionsService.upsert(user.id, tokens.refreshToken, deviceId);
-
-    return new ResponseFormat({
-      message: 'Logged in successfully!',
-      data: { tokens, user },
-    });
+    return this.generateTokensAndUpsertSession(
+      user,
+      deviceId,
+      'Logged in successfully!',
+    );
   }
 
-  async refresh({
-    deviceId,
-    refreshToken,
-  }: RefreshDto): Promise<ResponseFormat> {
-    const user = await this.verifyRefreshToken(refreshToken, deviceId);
-    if (!user) throw new SessionNotFoundException();
+  async refresh({ refreshToken }: RefreshDto): Promise<ResponseFormat> {
+    const user = await this.verifyRefreshToken(refreshToken);
+    if (!user || !user.deviceId) throw new SessionNotFoundException();
 
-    const tokens = await this.generateTokens(user.id, user.email, user.isAdmin);
-    await this.sessionsService.upsert(user.id, tokens.refreshToken, deviceId);
-
-    return new ResponseFormat({
-      message: 'Tokens refreshed successfully!',
-      data: tokens,
-    });
+    return this.generateTokensAndUpsertSession(
+      user,
+      user.deviceId,
+      'Tokens refreshed successfully!',
+    );
   }
 
-  async logout(
-    userId: number,
-    { deviceId }: LogoutDto,
-  ): Promise<ResponseFormat> {
-    await this.sessionsService.delete(userId, deviceId);
+  async logout({ refreshToken }: LogoutDto): Promise<ResponseFormat> {
+    const user = await this.verifyRefreshToken(refreshToken);
+    if (!user || !user.deviceId) throw new SessionNotFoundException();
+
+    await this.sessionsService.delete(user.id, user.deviceId);
     return new ResponseFormat({
       message: 'Logged out successfully!',
     });

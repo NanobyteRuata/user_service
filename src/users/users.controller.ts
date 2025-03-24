@@ -8,47 +8,61 @@ import {
   Query,
 } from '@nestjs/common';
 import { UsersService } from './users.service';
-import { UpdateUserDto } from 'src/users/dtos/update-user.dto';
+import { UpdateUserDto } from 'src/users/dtos/requests/update-user.dto';
 import { Admin, Self } from 'src/auth/auth.constant';
+import { FindAllUsersParams } from './dtos/params/find-all-users.params';
+import { ApiBearerAuth, ApiOperation, ApiResponse } from '@nestjs/swagger';
 
+@ApiBearerAuth('Bearer')
 @Controller('users')
 export class UsersController {
   constructor(private usersService: UsersService) {}
 
   @Admin()
-  @Get('')
-  findAll(
-    @Query('page') page: number = 1,
-    @Query('limit') limit: number = 10,
-    @Query('isActive') isActive?: boolean,
-  ) {
-    return this.usersService.findAll({ page, limit }, { isActive });
+  @Get()
+  @ApiOperation({ summary: 'Get all users with pagination' })
+  @ApiResponse({ status: 200, description: 'Users retrieved successfully' })
+  @ApiResponse({ status: 401, description: 'Unauthorized' })
+  findAllUsers(@Query() { page, limit, isActive }: FindAllUsersParams) {
+    return this.usersService.findAllUsers({ page, limit }, { isActive });
   }
 
   @Admin()
   @Self()
   @Get(':userId')
-  findOne(@Param('userId') userId: number) {
-    return this.usersService.findOne(userId);
+  @ApiOperation({ summary: 'Get a user by ID' })
+  @ApiResponse({ status: 200, description: 'User retrieved successfully' })
+  @ApiResponse({ status: 401, description: 'Unauthorized' })
+  findUserById(@Param('userId') userId: number) {
+    return this.usersService.findUserById(userId);
   }
 
   @Admin()
   @Self()
   @Patch(':userId')
-  update(@Param('userId') userId: number, @Body() payload: UpdateUserDto) {
-    return this.usersService.update(userId, payload);
+  @ApiOperation({ summary: 'Update a user by ID' })
+  @ApiResponse({ status: 200, description: 'User updated successfully' })
+  @ApiResponse({ status: 401, description: 'Unauthorized' })
+  updateUser(@Param('userId') userId: number, @Body() payload: UpdateUserDto) {
+    return this.usersService.updateUser(userId, payload);
   }
 
   @Admin()
   @Self()
   @Delete(':userId')
-  deactivate(@Param('userId') userId: number) {
-    return this.usersService.deactivate(userId);
+  @ApiOperation({ summary: 'Deactivate a user by ID' })
+  @ApiResponse({ status: 200, description: 'User deactivated successfully' })
+  @ApiResponse({ status: 401, description: 'Unauthorized' })
+  deactivateUser(@Param('userId') userId: number) {
+    return this.usersService.deactivateUser(userId);
   }
 
   @Admin()
   @Delete(':userId/hard-delete')
-  delete(@Param('userId') userId: number) {
-    return this.usersService.delete(userId);
+  @ApiOperation({ summary: 'Delete a user by ID' })
+  @ApiResponse({ status: 200, description: 'User deleted successfully' })
+  @ApiResponse({ status: 401, description: 'Unauthorized' })
+  deleteUser(@Param('userId') userId: number) {
+    return this.usersService.deleteUser(userId);
   }
 }

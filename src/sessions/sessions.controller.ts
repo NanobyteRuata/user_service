@@ -1,7 +1,15 @@
 import { Body, Controller, Get, Post, Query } from '@nestjs/common';
 import { SessionsService } from './sessions.service';
 import { Admin, Self } from 'src/auth/auth.constant';
+import { FindAllSessionsParams } from './dtos/params/find-all-sessions.params';
+import {
+  ApiBearerAuth,
+  ApiOperation,
+  ApiResponse,
+} from '@nestjs/swagger/dist/decorators';
+import { EndSessionDto } from './dtos/requests/end-session.dto';
 
+@ApiBearerAuth('Bearer')
 @Controller('sessions')
 export class SessionsController {
   constructor(private readonly sessionsService: SessionsService) {}
@@ -9,11 +17,10 @@ export class SessionsController {
   @Admin()
   @Self()
   @Get()
-  findAll(
-    @Query('page') page: number = 1,
-    @Query('limit') limit: number = 10,
-    @Query('userId') userId?: number,
-  ) {
+  @ApiOperation({ summary: 'Get all sessions with pagination' })
+  @ApiResponse({ status: 200, description: 'Sessions retrieved successfully' })
+  @ApiResponse({ status: 401, description: 'Unauthorized' })
+  findAll(@Query() { page, limit, userId }: FindAllSessionsParams) {
     if (userId) {
       return this.sessionsService.findByUserId(userId, { page, limit });
     }
@@ -24,7 +31,10 @@ export class SessionsController {
   @Admin()
   @Self()
   @Post('end-session')
-  endSession(@Body() payload: { userId: number; deviceIds: string[] }) {
-    return this.sessionsService.delete(payload.userId, payload.deviceIds);
+  @ApiOperation({ summary: 'End user sessions' })
+  @ApiResponse({ status: 200, description: 'Sessions ended successfully' })
+  @ApiResponse({ status: 401, description: 'Unauthorized' })
+  endSession(@Body() payload: EndSessionDto) {
+    return this.sessionsService.endSession(payload.userId, payload.deviceIds);
   }
 }
