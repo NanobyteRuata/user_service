@@ -1,4 +1,6 @@
-export function toCamelCase(obj: object): object {
+export function toCamelCase(
+  obj: object | null | undefined | string | number | boolean,
+): object | null | undefined | string | number | boolean {
   if (obj === null || obj === undefined) {
     return obj;
   }
@@ -20,6 +22,6 @@ export function toCamelCase(obj: object): object {
       acc[camelKey] = toCamelCase(obj[key]);
       return acc;
     },
-    {} as Record<string, object>,
+    {} as Record<string, object | null | undefined | string | number | boolean>,
   );
 }
