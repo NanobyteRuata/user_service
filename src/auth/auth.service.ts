@@ -4,7 +4,7 @@ import * as bcrypt from 'bcrypt';
 import { User } from 'src/users/user.entity';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Auth } from './auth.entity';
-import { Repository } from 'typeorm';
+import { MoreThan, Repository } from 'typeorm';
 import { RegisterDto } from 'src/auth/dtos/requests/register.dto';
 import { LoginDto } from 'src/auth/dtos/requests/login.dto';
 import { ConfigService } from '@nestjs/config';
@@ -15,9 +15,16 @@ import { Tokens } from '../common/models/tokens.model';
 import { ResponseFormat } from 'src/common/models/response-format.model';
 import { LogoutDto } from './dtos/requests/logout.dto';
 import { UserAlreadyExistsException } from 'src/core/exceptions/user-exceptions';
-import { WrongCredentialsException } from 'src/core/exceptions/auth-exceptions';
+import {
+  InvalidTokenException,
+  WrongCredentialsException,
+} from 'src/core/exceptions/auth-exceptions';
 import { SessionNotFoundException } from 'src/core/exceptions/session-exceptions';
 import { v4 as uuidv4 } from 'uuid';
+import { randomInt } from 'crypto';
+import { ResetPasswordDto } from './dtos/requests/reset-password.dto';
+import { EmailService } from 'src/common/services/email.service';
+import { EmailServiceException } from 'src/core/exceptions/common-exceptions';
 
 @Injectable()
 export class AuthService {
@@ -27,6 +34,7 @@ export class AuthService {
     private jwtService: JwtService,
     private configService: ConfigService,
     private sessionsService: SessionsService,
+    private emailService: EmailService,
   ) {}
 
   private async validateUser(email: string, password: string): Promise<User> {
@@ -116,6 +124,28 @@ export class AuthService {
     });
   }
 
+  private async sendPasswordResetEmail(
+    email: string,
+    resetToken: string,
+  ): Promise<void> {
+    await this.emailService.sendEmail(
+      email,
+      'Reset Your Password',
+      `
+      <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; border: 1px solid #e0e0e0; border-radius: 5px;">
+        <h2 style="color: #333;">Reset Your Password</h2>
+        <p>You requested a password reset for your RExpense account.</p>
+        <p>Your verification code is:</p>
+        <div style="background-color: #f5f5f5; padding: 15px; border-radius: 5px; text-align: center; margin: 20px 0;">
+          <h2 style="letter-spacing: 5px; font-size: 24px; margin: 0;">${resetToken}</h2>
+        </div>
+        <p>This code will expire in 10 minutes.</p>
+        <p>If you didn't request this password reset, please ignore this email.</p>
+      </div>
+    `,
+    );
+  }
+
   async register({ password, ...user }: RegisterDto): Promise<ResponseFormat> {
     const { email } = user;
     const userExists = await this.authRepository.findOne({
@@ -171,6 +201,84 @@ export class AuthService {
     await this.sessionsService.delete(user.id, user.deviceId);
     return new ResponseFormat({
       message: 'Logged out successfully!',
+    });
+  }
+
+  async forgotPassword(email: string): Promise<ResponseFormat> {
+    const auth = await this.authRepository.findOne({
+      where: { user: { email, isActive: true } },
+      relations: ['user'],
+    });
+
+    if (!auth) {
+      // For security reasons, don't reveal if the email exists
+      return new ResponseFormat({
+        message: 'If your email is registered, you will receive an OTP code',
+      });
+    }
+
+    // Generate 6-digit OTP
+    const resetPasswordToken = randomInt(100000, 1000000)
+      .toString()
+      .padStart(6, '0');
+
+    // OTP expires in 10 minutes
+    const tenMinutesInMs = 10 * 60 * 1000;
+    const expiresInMs = new Date().getTime() + tenMinutesInMs;
+    const expires = new Date(expiresInMs);
+
+    // Save OTP to database
+    auth.resetPasswordToken = resetPasswordToken;
+    auth.resetPasswordExpires = expires;
+    await this.authRepository.save(auth);
+
+    // Send email with OTP
+    try {
+      await this.sendPasswordResetEmail(email, resetPasswordToken);
+    } catch (error) {
+      // If it's email service exception, throw it
+      if (error instanceof EmailServiceException) {
+        console.error('Error sending password reset email:', error);
+        throw error;
+      }
+
+      // Otherwise, still return success to avoid revealing if user exists
+    }
+
+    return new ResponseFormat({
+      message: 'If your email is registered, you will receive an OTP code',
+    });
+  }
+
+  async resetPassword({
+    resetPasswordToken,
+    password,
+    email,
+  }: ResetPasswordDto): Promise<ResponseFormat> {
+    const auth = await this.authRepository.findOne({
+      where: {
+        resetPasswordToken,
+        resetPasswordExpires: MoreThan(new Date()),
+      },
+      relations: ['user'],
+    });
+
+    if (!auth || auth.user.email !== email) {
+      throw new InvalidTokenException();
+    }
+
+    const hashedPassword = await bcrypt.hash(password, 10);
+
+    auth.password = hashedPassword;
+    auth.resetPasswordToken = null;
+    auth.resetPasswordExpires = null;
+    await this.authRepository.save(auth);
+
+    // Invalidate all existing sessions for security
+    await this.sessionsService.endAllUserSessions(auth.user.id);
+
+    return new ResponseFormat({
+      message: 'Password has been reset successfully',
     });
   }
 }

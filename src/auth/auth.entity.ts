@@ -21,4 +21,10 @@ export class Auth {
 
   @Column()
   password: string;
+
+  @Column({ nullable: true, default: null, type: 'varchar' })
+  resetPasswordToken: string | null;
+
+  @Column({ nullable: true, default: null, type: 'timestamp' })
+  resetPasswordExpires: Date | null;
 }

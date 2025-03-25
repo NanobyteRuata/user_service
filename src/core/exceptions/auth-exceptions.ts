@@ -11,3 +11,9 @@ export class UnauthorizedUserException extends HttpException {
     super('Unauthorized user', HttpStatus.UNAUTHORIZED);
   }
 }
+
+export class InvalidTokenException extends HttpException {
+  constructor() {
+    super('Invalid or expired token', HttpStatus.BAD_REQUEST);
+  }
+}

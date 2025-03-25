@@ -7,24 +7,12 @@ import {
   Matches,
 } from 'class-validator';
 
-export class RegisterDto {
-  @ApiProperty({
-    name: 'name',
-    example: 'John Doe',
-    type: String,
-    description: 'User display name',
-  })
-  @Length(3)
-  @IsString()
-  @IsNotEmpty()
-  name: string;
-
+export class ResetPasswordDto {
   @ApiProperty({
     name: 'email',
     example: 'john.doe@example.com',
     type: String,
     format: 'email',
-    uniqueItems: true,
     description: 'User email address',
   })
   @IsEmail()
@@ -33,10 +21,24 @@ export class RegisterDto {
   email: string;
 
   @ApiProperty({
-    name: 'password',
-    example: 'password123',
+    name: 'resetPasswordToken',
+    example: '123456',
     type: String,
-    description: 'User password',
+    description: 'Six-digit OTP code',
+  })
+  @Matches(/^[0-9]{6}$/, {
+    message: 'OTP must be exactly 6 digits',
+  })
+  @Length(6, 6)
+  @IsString()
+  @IsNotEmpty()
+  resetPasswordToken: string;
+
+  @ApiProperty({
+    name: 'password',
+    example: 'newPassword123',
+    type: String,
+    description: 'New password',
   })
   @Matches(/^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)/, {
     message:

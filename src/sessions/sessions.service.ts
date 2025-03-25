@@ -121,4 +121,13 @@ export class SessionsService {
       message: 'Sessions ended successfully',
     });
   }
+
+  async endAllUserSessions(userId: number): Promise<ResponseFormat> {
+    await this.sessionRepository.delete({ user: { id: userId } });
+
+    return new ResponseFormat({
+      status: 'success',
+      message: 'All user sessions ended successfully',
+    });
+  }
 }

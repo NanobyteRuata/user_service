@@ -6,6 +6,8 @@ import { LoginDto } from 'src/auth/dtos/requests/login.dto';
 import { RefreshDto } from 'src/auth/dtos/requests/refresh.dto';
 import { LogoutDto } from './dtos/requests/logout.dto';
 import { ApiBearerAuth, ApiOperation, ApiResponse } from '@nestjs/swagger';
+import { ForgotPasswordDto } from './dtos/requests/forgot-password.dto';
+import { ResetPasswordDto } from './dtos/requests/reset-password.dto';
 
 @Controller('auth')
 export class AuthController {
@@ -53,5 +55,25 @@ export class AuthController {
   @ApiResponse({ status: 401, description: 'Unauthorized' })
   logout(@Body() payload: LogoutDto) {
     return this.authService.logout(payload);
+  }
+
+  @Post('forgot-password')
+  @Public()
+  @ApiOperation({ summary: 'Request password reset' })
+  @ApiResponse({
+    status: 200,
+    description: 'Password reset email sent if email exists',
+  })
+  forgotPassword(@Body() forgotPasswordDto: ForgotPasswordDto) {
+    return this.authService.forgotPassword(forgotPasswordDto.email);
+  }
+
+  @Post('reset-password')
+  @Public()
+  @ApiOperation({ summary: 'Reset password using token' })
+  @ApiResponse({ status: 200, description: 'Password reset successful' })
+  @ApiResponse({ status: 400, description: 'Invalid or expired token' })
+  resetPassword(@Body() resetPasswordDto: ResetPasswordDto) {
+    return this.authService.resetPassword(resetPasswordDto);
   }
 }
