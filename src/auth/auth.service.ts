@@ -17,6 +17,7 @@ import { LogoutDto } from './dtos/requests/logout.dto';
 import { UserAlreadyExistsException } from 'src/core/exceptions/user-exceptions';
 import {
   InvalidTokenException,
+  TooManyAttemptsException,
   WrongCredentialsException,
 } from 'src/core/exceptions/auth-exceptions';
 import { SessionNotFoundException } from 'src/core/exceptions/session-exceptions';
@@ -263,9 +264,32 @@ export class AuthService {
       relations: ['user'],
     });
 
-    if (!auth || auth.user.email !== email) {
+    if (!auth) {
       throw new InvalidTokenException();
     }
+
+    // Check attempts
+    if (auth.resetPasswordAttempts >= 5) {
+      // Invalidate token after too many attempts
+      auth.resetPasswordToken = null;
+      auth.resetPasswordExpires = null;
+      auth.resetPasswordAttempts = 0;
+      await this.authRepository.save(auth);
+      throw new TooManyAttemptsException();
+    }
+
+    // If token doesn't match
+    if (
+      auth.resetPasswordToken !== resetPasswordToken ||
+      auth.user.email !== email
+    ) {
+      auth.resetPasswordAttempts += 1;
+      await this.authRepository.save(auth);
+      throw new InvalidTokenException();
+    }
+
+    // Reset attempts on success
+    auth.resetPasswordAttempts = 0;
 
     const hashedPassword = await bcrypt.hash(password, 10);
 
@@ -276,6 +300,14 @@ export class AuthService {
 
     // Invalidate all existing sessions for security
     await this.sessionsService.endAllUserSessions(auth.user.id);
+
+    // Notify user that their password has been changed
+    await this.emailService.sendEmail(
+      auth.user.email,
+      'Your Password Has Been Changed',
+      `Your password was recently changed on ${new Date().toLocaleString()}.
+       If you did not make this change, please contact support immediately.`,
+    );
 
     return new ResponseFormat({
       message: 'Password has been reset successfully',

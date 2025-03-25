@@ -27,4 +27,7 @@ export class Auth {
 
   @Column({ nullable: true, default: null, type: 'timestamp' })
   resetPasswordExpires: Date | null;
+
+  @Column({ default: 0 })
+  resetPasswordAttempts: number;
 }

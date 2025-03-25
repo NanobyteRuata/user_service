@@ -8,7 +8,9 @@ import { LogoutDto } from './dtos/requests/logout.dto';
 import { ApiBearerAuth, ApiOperation, ApiResponse } from '@nestjs/swagger';
 import { ForgotPasswordDto } from './dtos/requests/forgot-password.dto';
 import { ResetPasswordDto } from './dtos/requests/reset-password.dto';
+import { Throttle } from '@nestjs/throttler';
 
+@Throttle({ default: { limit: 5, ttl: 60000 } })
 @Controller('auth')
 export class AuthController {
   constructor(private authService: AuthService) {}

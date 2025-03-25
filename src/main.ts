@@ -4,9 +4,13 @@ import { ValidationPipe } from '@nestjs/common';
 import { ResponseInterceptor } from './core/interceptors/response.interceptor';
 import { HttpExceptionFilter } from './core/filters/http-exception.filter';
 import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
+import helmet from 'helmet';
 
 async function bootstrap() {
   const app = await NestFactory.create(AppModule);
+
+  // Enable helmet for security headers
+  app.use(helmet());
 
   // Swagger
   const swaggerConfig = new DocumentBuilder()

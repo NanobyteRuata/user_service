@@ -17,3 +17,9 @@ export class InvalidTokenException extends HttpException {
     super('Invalid or expired token', HttpStatus.BAD_REQUEST);
   }
 }
+
+export class TooManyAttemptsException extends HttpException {
+  constructor() {
+    super('Too many attempts', HttpStatus.BAD_REQUEST);
+  }
+}
