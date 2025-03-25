@@ -63,25 +63,26 @@ npm install
 
 3. Set up environment variables (create a `.env` file)
 ```env
-# Database
-DB_HOST=localhost
-DB_PORT=5432
-DB_USERNAME=postgres
-DB_PASSWORD=yourpassword
-DB_DATABASE=user_service
+#APP
+PORT=3000
 
 # JWT
-JWT_SECRET=your-jwt-secret
-JWT_EXPIRATION=1h
-REFRESH_TOKEN_EXPIRATION=7d
+JWT_ACCESS_SECRET=JWT_ACCESS_SECRET
+JWT_ACCESS_EXPIRE_IN=15m
+JWT_REFRESH_SECRET=JWT_REFRESH_SECRET
+JWT_REFRESH_EXPIRE_IN=7d
 
-# SendGrid
-SENDGRID_API_KEY=your-sendgrid-api-key
-SENDGRID_FROM_EMAIL=noreply@yourdomain.com
+# DATABASE
+DB_HOST=localhost
+DB_PORT=5432
+DB_USERNAME=root
+DB_PASSWORD=pass
+DB_DATABASE=postgres
+DB_SYNCHRONIZE=true #false in prod
 
-# App
-PORT=3000
-NODE_ENV=development
+#EMAIL SENDGRID
+SENDGRID_API_KEY=SENDGRID_API_KEY
+SENDGRID_FROM_EMAIL=SENDGRID_FROM_EMAIL
 ```
 
 4. Start the application
@@ -159,15 +160,6 @@ npm run lint:fix
 # Unit tests
 npm run test
 ```
-
-## Future Improvements
-
-- Two-factor authentication
-- OAuth providers integration
-- Enhanced security logging system
-- Password strength metrics
-- Admin dashboard for user management
-- Self-service security tools for users
 
 ## License
 
