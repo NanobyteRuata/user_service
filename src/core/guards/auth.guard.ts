@@ -43,7 +43,6 @@ export class AuthGuard implements CanActivate {
     request: Request,
     user: JwtPayloadUser,
   ): boolean {
-    console.log(request.query);
     if (user.isAdmin) return true;
 
     const isSelfEndpoint = this.isGuarded(context, IS_SELF_KEY);
