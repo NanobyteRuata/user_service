@@ -1,9 +1,13 @@
 import { CanActivate, ExecutionContext, Injectable } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
-import { IS_ADMIN_KEY, IS_PUBLIC_KEY, IS_SELF_KEY } from '../auth.constant';
+import {
+  IS_ADMIN_KEY,
+  IS_PUBLIC_KEY,
+  IS_SELF_KEY,
+} from '../../auth/auth.constant';
 import { Request } from 'express';
 import { Reflector } from '@nestjs/core';
-import { JwtPayloadUser } from '../models/jwt-payload-user.model';
+import { JwtPayloadUser } from '../../auth/models/jwt-payload-user.model';
 import { UnauthorizedUserException } from 'src/core/exceptions/auth-exceptions';
 
 @Injectable()
@@ -39,6 +43,7 @@ export class AuthGuard implements CanActivate {
     request: Request,
     user: JwtPayloadUser,
   ): boolean {
+    console.log(request.query);
     if (user.isAdmin) return true;
 
     const isSelfEndpoint = this.isGuarded(context, IS_SELF_KEY);

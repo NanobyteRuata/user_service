@@ -11,6 +11,7 @@ import { UsersService } from './users.service';
 import { UpdateUserDto } from 'src/users/dtos/requests/update-user.dto';
 import { Admin, Self } from 'src/auth/auth.constant';
 import { FindAllUsersParams } from './dtos/params/find-all-users.params';
+import { FindByUserIdParams } from './dtos/params/find-by-user-id.params';
 import { ApiBearerAuth, ApiOperation, ApiResponse } from '@nestjs/swagger';
 
 @ApiBearerAuth('Bearer')
@@ -33,7 +34,7 @@ export class UsersController {
   @ApiOperation({ summary: 'Get a user by ID' })
   @ApiResponse({ status: 200, description: 'User retrieved successfully' })
   @ApiResponse({ status: 401, description: 'Unauthorized' })
-  findUserById(@Param('userId') userId: number) {
+  findUserById(@Param() { userId }: FindByUserIdParams) {
     return this.usersService.findUserById(userId);
   }
 
@@ -43,7 +44,10 @@ export class UsersController {
   @ApiOperation({ summary: 'Update a user by ID' })
   @ApiResponse({ status: 200, description: 'User updated successfully' })
   @ApiResponse({ status: 401, description: 'Unauthorized' })
-  updateUser(@Param('userId') userId: number, @Body() payload: UpdateUserDto) {
+  updateUser(
+    @Param() { userId }: FindByUserIdParams,
+    @Body() payload: UpdateUserDto,
+  ) {
     return this.usersService.updateUser(userId, payload);
   }
 
@@ -53,7 +57,7 @@ export class UsersController {
   @ApiOperation({ summary: 'Deactivate a user by ID' })
   @ApiResponse({ status: 200, description: 'User deactivated successfully' })
   @ApiResponse({ status: 401, description: 'Unauthorized' })
-  deactivateUser(@Param('userId') userId: number) {
+  deactivateUser(@Param() { userId }: FindByUserIdParams) {
     return this.usersService.deactivateUser(userId);
   }
 
@@ -62,7 +66,7 @@ export class UsersController {
   @ApiOperation({ summary: 'Delete a user by ID' })
   @ApiResponse({ status: 200, description: 'User deleted successfully' })
   @ApiResponse({ status: 401, description: 'Unauthorized' })
-  deleteUser(@Param('userId') userId: number) {
+  deleteUser(@Param() { userId }: FindByUserIdParams) {
     return this.usersService.deleteUser(userId);
   }
 }

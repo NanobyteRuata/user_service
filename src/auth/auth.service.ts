@@ -62,7 +62,10 @@ export class AuthService {
       const isMatch = await bcrypt.compare(refreshToken, session.refreshToken);
       if (!isMatch) return null;
 
-      return payload;
+      return {
+        ...payload,
+        isAdmin: session.user?.isAdmin ?? payload.isAdmin,
+      };
     } catch {
       return null;
     }

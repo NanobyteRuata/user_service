@@ -5,11 +5,7 @@ import { RegisterDto } from 'src/auth/dtos/requests/register.dto';
 import { LoginDto } from 'src/auth/dtos/requests/login.dto';
 import { RefreshDto } from 'src/auth/dtos/requests/refresh.dto';
 import { LogoutDto } from './dtos/requests/logout.dto';
-import {
-  ApiBearerAuth,
-  ApiOperation,
-  ApiResponse,
-} from '@nestjs/swagger';
+import { ApiBearerAuth, ApiOperation, ApiResponse } from '@nestjs/swagger';
 
 @Controller('auth')
 export class AuthController {
@@ -49,11 +45,11 @@ export class AuthController {
   }
 
   @Post('logout')
-  @HttpCode(204)
+  @HttpCode(200)
   @Public()
   @ApiBearerAuth('Bearer')
   @ApiOperation({ summary: 'Logout a user' })
-  @ApiResponse({ status: 204, description: 'User logged out successfully' })
+  @ApiResponse({ status: 200, description: 'User logged out successfully' })
   @ApiResponse({ status: 401, description: 'Unauthorized' })
   logout(@Body() payload: LogoutDto) {
     return this.authService.logout(payload);

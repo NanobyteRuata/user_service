@@ -29,9 +29,9 @@ export class SessionsService {
   }
 
   async getSession(userId: number, deviceId: string): Promise<Session | null> {
-    return await this.sessionRepository.findOneBy({
-      user: { id: userId },
-      deviceId,
+    return await this.sessionRepository.findOne({
+      where: { user: { id: userId }, deviceId },
+      relations: ['user'], // include user to get last updated isAdmin
     });
   }
 

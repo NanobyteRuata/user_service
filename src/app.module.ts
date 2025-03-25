@@ -5,9 +5,11 @@ import { TypeOrmModule } from '@nestjs/typeorm';
 import { ConfigModule } from '@nestjs/config';
 import { SessionsModule } from './sessions/sessions.module';
 import { ScheduleModule } from '@nestjs/schedule';
+import { CoreModule } from './core/core.module';
 
 @Module({
   imports: [
+    CoreModule,
     AuthModule,
     UsersModule,
     SessionsModule,

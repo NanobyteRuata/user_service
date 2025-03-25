@@ -9,6 +9,7 @@ import {
 
 export class UpdateUserDto {
   @ApiProperty({
+    name: 'name',
     description: 'User display name',
     example: 'John Doe',
     minLength: 3,
@@ -20,6 +21,7 @@ export class UpdateUserDto {
   name?: string;
 
   @ApiProperty({
+    name: 'email',
     description: 'User email address',
     example: 'john.doe@example.com',
     format: 'email',
@@ -31,6 +33,7 @@ export class UpdateUserDto {
   email?: string;
 
   @ApiProperty({
+    name: 'is_active',
     description: 'User account status',
     example: true,
     default: true,
