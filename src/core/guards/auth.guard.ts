@@ -7,7 +7,7 @@ import {
 } from '../../auth/auth.constant';
 import { Request } from 'express';
 import { Reflector } from '@nestjs/core';
-import { JwtPayloadUser } from '../../auth/models/jwt-payload-user.model';
+import { JwtPayloadUser } from '../../common/models/jwt-payload-user.model';
 import { UnauthorizedUserException } from 'src/core/exceptions/auth-exceptions';
 
 @Injectable()

@@ -7,7 +7,7 @@ import {
   Logger,
 } from '@nestjs/common';
 import { Response } from 'express';
-import { ResponseFormat } from 'src/common/model/response-format.model';
+import { ResponseFormat } from 'src/common/models/response-format.model';
 
 @Catch()
 export class HttpExceptionFilter implements ExceptionFilter {

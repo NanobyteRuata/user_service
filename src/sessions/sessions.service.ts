@@ -5,7 +5,7 @@ import { DeleteResult, In, Repository } from 'typeorm';
 import { ConfigService } from '@nestjs/config';
 import { toMs } from 'ms-typescript';
 import { IPaginationOptions, paginate } from 'nestjs-typeorm-paginate';
-import { ResponseFormat } from 'src/common/model/response-format.model';
+import { ResponseFormat } from 'src/common/models/response-format.model';
 import { SessionDto } from './dtos/responses/session.dto';
 
 @Injectable()

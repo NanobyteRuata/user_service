@@ -4,7 +4,7 @@ import { Repository } from 'typeorm';
 import { User } from './user.entity';
 import { UpdateUserDto } from 'src/users/dtos/requests/update-user.dto';
 import { UserNotFoundException } from 'src/core/exceptions/user-exceptions';
-import { ResponseFormat } from 'src/common/model/response-format.model';
+import { ResponseFormat } from 'src/common/models/response-format.model';
 import { IPaginationOptions } from 'nestjs-typeorm-paginate';
 import { paginate } from 'nestjs-typeorm-paginate';
 

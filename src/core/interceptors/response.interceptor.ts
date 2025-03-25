@@ -6,7 +6,7 @@ import {
 } from '@nestjs/common';
 import { map } from 'rxjs/operators';
 import { toSnakeCase } from '../utils/to-snake-case';
-import { ResponseFormat } from 'src/common/model/response-format.model';
+import { ResponseFormat } from 'src/common/models/response-format.model';
 
 @Injectable()
 export class ResponseInterceptor<T> implements NestInterceptor<T, any> {
