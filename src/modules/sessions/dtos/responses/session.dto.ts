@@ -1,5 +1,5 @@
-import { Session } from 'src/sessions/session.entity';
-import { User } from 'src/users/user.entity';
+import { Session } from '../../../sessions/session.entity';
+import { User } from '../../../users/user.entity';
 
 export class SessionDto {
   id: number;

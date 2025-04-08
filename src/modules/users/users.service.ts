@@ -2,17 +2,20 @@ import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { User } from './user.entity';
-import { UpdateUserDto } from 'src/users/dtos/requests/update-user.dto';
+import { UpdateUserDto } from './dtos/requests/update-user.dto';
 import { UserNotFoundException } from 'src/core/exceptions/user-exceptions';
 import { ResponseFormat } from 'src/common/models/response-format.model';
 import { IPaginationOptions } from 'nestjs-typeorm-paginate';
 import { paginate } from 'nestjs-typeorm-paginate';
+import { KafkaService } from 'src/kafka/kafka.service';
+import { MessageTypes } from 'src/kafka/kafka.constants';
 
 @Injectable()
 export class UsersService {
   constructor(
     @InjectRepository(User)
     private readonly userRepository: Repository<User>,
+    private readonly kafkaService: KafkaService,
   ) {}
 
   async findAllUsers(
@@ -56,6 +59,13 @@ export class UsersService {
 
     const response = await this.findUserById(id);
     response.message = 'User updated successfully';
+
+    // Emit user update event
+    await this.kafkaService.emitMessage(
+      MessageTypes.USER_UPDATED,
+      response.data,
+    );
+
     return response;
   }
 
@@ -70,6 +80,9 @@ export class UsersService {
     if (!data) throw new UserNotFoundException(id);
 
     await this.userRepository.delete(id);
+
+    // Emit user delete event
+    await this.kafkaService.emitMessage(MessageTypes.USER_DELETED, data);
 
     return new ResponseFormat({
       status: 'success',

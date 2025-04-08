@@ -1,5 +1,5 @@
-import { Auth } from 'src/auth/auth.entity';
-import { Session } from 'src/sessions/session.entity';
+import { Auth } from 'src/modules/auth/auth.entity';
+import { Session } from 'src/modules/sessions/session.entity';
 import {
   Entity,
   PrimaryGeneratedColumn,

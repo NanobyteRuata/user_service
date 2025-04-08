@@ -1,19 +1,19 @@
 import { Injectable } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import * as bcrypt from 'bcrypt';
-import { User } from 'src/users/user.entity';
+import { User } from 'src/modules/users/user.entity';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Auth } from './auth.entity';
 import { MoreThan, Repository } from 'typeorm';
-import { RegisterDto } from 'src/auth/dtos/requests/register.dto';
-import { LoginDto } from 'src/auth/dtos/requests/login.dto';
+import { RegisterDto } from 'src/modules/auth/dtos/requests/register.dto';
+import { LoginDto } from 'src/modules/auth/dtos/requests/login.dto';
 import { ConfigService } from '@nestjs/config';
-import { JwtPayloadUser } from '../common/models/jwt-payload-user.model';
-import { SessionsService } from 'src/sessions/sessions.service';
-import { RefreshDto } from 'src/auth/dtos/requests/refresh.dto';
-import { Tokens } from '../common/models/tokens.model';
+import { JwtPayloadUser } from 'src/common/models/jwt-payload-user.model';
+import { SessionsService } from 'src/modules/sessions/sessions.service';
+import { RefreshDto } from 'src/modules/auth/dtos/requests/refresh.dto';
+import { Tokens } from 'src/common/models/tokens.model';
 import { ResponseFormat } from 'src/common/models/response-format.model';
-import { LogoutDto } from './dtos/requests/logout.dto';
+import { LogoutDto } from 'src/modules/auth/dtos/requests/logout.dto';
 import { UserAlreadyExistsException } from 'src/core/exceptions/user-exceptions';
 import {
   InvalidTokenException,
@@ -23,15 +23,18 @@ import {
 import { SessionNotFoundException } from 'src/core/exceptions/session-exceptions';
 import { v4 as uuidv4 } from 'uuid';
 import { randomInt } from 'crypto';
-import { ResetPasswordDto } from './dtos/requests/reset-password.dto';
+import { ResetPasswordDto } from 'src/modules/auth/dtos/requests/reset-password.dto';
 import { EmailService } from 'src/common/services/email.service';
 import { EmailServiceException } from 'src/core/exceptions/common-exceptions';
+import { KafkaService } from 'src/kafka/kafka.service';
+import { MessageTypes } from 'src/kafka/kafka.constants';
 
 @Injectable()
 export class AuthService {
   constructor(
     @InjectRepository(Auth)
     private readonly authRepository: Repository<Auth>,
+    private readonly kafkaService: KafkaService,
     private jwtService: JwtService,
     private configService: ConfigService,
     private sessionsService: SessionsService,
@@ -62,10 +65,10 @@ export class AuthService {
           secret: this.configService.get<string>('JWT_REFRESH_SECRET'),
         },
       );
-      const { deviceId, ...user } = payload;
-      if (!deviceId) return null;
+      const { device_id, ...user } = payload;
+      if (!device_id) return null;
 
-      const session = await this.sessionsService.getSession(user.id, deviceId);
+      const session = await this.sessionsService.getSession(user.id, device_id);
       if (!session || !session.refreshToken) return null;
 
       const isMatch = await bcrypt.compare(refreshToken, session.refreshToken);
@@ -73,7 +76,7 @@ export class AuthService {
 
       return {
         ...payload,
-        isAdmin: session.user?.isAdmin ?? payload.isAdmin,
+        is_admin: session.user?.isAdmin ?? payload.is_admin,
       };
     } catch {
       return null;
@@ -81,17 +84,17 @@ export class AuthService {
   }
 
   private async generateTokens(
-    { id, email, isAdmin }: User | JwtPayloadUser,
+    user: User | JwtPayloadUser,
     deviceId: string,
   ): Promise<Tokens> {
     const accessPayload: JwtPayloadUser = {
-      id,
-      email,
-      isAdmin,
+      id: user.id,
+      email: user.email,
+      is_admin: 'is_admin' in user ? user.is_admin : user.isAdmin,
     };
     const refreshPayload = {
       ...accessPayload,
-      deviceId, // Include deviceId in refresh token only
+      device_id: deviceId, // Include deviceId in refresh token only
     };
 
     const accessToken = await this.jwtService.signAsync(accessPayload, {
@@ -121,7 +124,10 @@ export class AuthService {
 
     return new ResponseFormat({
       message,
-      data: tokens,
+      data: {
+        tokens,
+        user,
+      },
     });
   }
 
@@ -163,6 +169,10 @@ export class AuthService {
       password: hashedPassword,
     });
     await this.authRepository.save(auth);
+
+    // emit user registered event
+    await this.kafkaService.emitMessage(MessageTypes.USER_CREATED, auth.user);
+
     return new ResponseFormat({
       message: 'Registered successfully!',
       data: auth.user,
@@ -178,7 +188,12 @@ export class AuthService {
     if (!deviceId) deviceId = uuidv4();
 
     return this.generateTokensAndUpsertSession(
-      user,
+      {
+        id: user.id,
+        email: user.email,
+        is_admin: user.isAdmin,
+        device_id: deviceId,
+      },
       deviceId,
       'Logged in successfully!',
     );
@@ -186,20 +201,25 @@ export class AuthService {
 
   async refresh({ refreshToken }: RefreshDto): Promise<ResponseFormat> {
     const user = await this.verifyRefreshToken(refreshToken);
-    if (!user || !user.deviceId) throw new SessionNotFoundException();
+    if (!user || !user.device_id) throw new SessionNotFoundException();
 
     return this.generateTokensAndUpsertSession(
-      user,
-      user.deviceId,
+      {
+        id: user.id,
+        email: user.email,
+        is_admin: user.is_admin,
+        device_id: user.device_id,
+      },
+      user.device_id,
       'Tokens refreshed successfully!',
     );
   }
 
   async logout({ refreshToken }: LogoutDto): Promise<ResponseFormat> {
     const user = await this.verifyRefreshToken(refreshToken);
-    if (!user || !user.deviceId) throw new SessionNotFoundException();
+    if (!user || !user.device_id) throw new SessionNotFoundException();
 
-    await this.sessionsService.delete(user.id, user.deviceId);
+    await this.sessionsService.delete(user.id, user.device_id);
     return new ResponseFormat({
       message: 'Logged out successfully!',
     });

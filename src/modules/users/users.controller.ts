@@ -8,8 +8,8 @@ import {
   Query,
 } from '@nestjs/common';
 import { UsersService } from './users.service';
-import { UpdateUserDto } from 'src/users/dtos/requests/update-user.dto';
-import { Admin, Self } from 'src/auth/auth.constant';
+import { UpdateUserDto } from 'src/modules/users/dtos/requests/update-user.dto';
+import { Admin, Self } from 'src/modules/auth/auth.constant';
 import { FindAllUsersParams } from './dtos/params/find-all-users.params';
 import { FindByUserIdParams } from './dtos/params/find-by-user-id.params';
 import { ApiBearerAuth, ApiOperation, ApiResponse } from '@nestjs/swagger';

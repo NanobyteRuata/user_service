@@ -4,7 +4,7 @@ import {
   IS_ADMIN_KEY,
   IS_PUBLIC_KEY,
   IS_SELF_KEY,
-} from '../../auth/auth.constant';
+} from '../../modules/auth/auth.constant';
 import { Request } from 'express';
 import { Reflector } from '@nestjs/core';
 import { JwtPayloadUser } from '../../common/models/jwt-payload-user.model';
@@ -43,7 +43,7 @@ export class AuthGuard implements CanActivate {
     request: Request,
     user: JwtPayloadUser,
   ): boolean {
-    if (user.isAdmin) return true;
+    if (user.is_admin) return true;
 
     const isSelfEndpoint = this.isGuarded(context, IS_SELF_KEY);
     const targetUserId = Number(

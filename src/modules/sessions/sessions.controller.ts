@@ -1,6 +1,6 @@
 import { Body, Controller, Get, Post, Query } from '@nestjs/common';
 import { SessionsService } from './sessions.service';
-import { Admin, Self } from 'src/auth/auth.constant';
+import { Admin, Self } from 'src/modules/auth/auth.constant';
 import { FindAllSessionsParams } from './dtos/params/find-all-sessions.params';
 import {
   ApiBearerAuth,

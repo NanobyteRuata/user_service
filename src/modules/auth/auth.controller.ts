@@ -1,9 +1,9 @@
 import { Body, Controller, HttpCode, Post } from '@nestjs/common';
 import { AuthService } from './auth.service';
 import { Public } from './auth.constant';
-import { RegisterDto } from 'src/auth/dtos/requests/register.dto';
-import { LoginDto } from 'src/auth/dtos/requests/login.dto';
-import { RefreshDto } from 'src/auth/dtos/requests/refresh.dto';
+import { RegisterDto } from './dtos/requests/register.dto';
+import { LoginDto } from './dtos/requests/login.dto';
+import { RefreshDto } from './dtos/requests/refresh.dto';
 import { LogoutDto } from './dtos/requests/logout.dto';
 import { ApiBearerAuth, ApiOperation, ApiResponse } from '@nestjs/swagger';
 import { ForgotPasswordDto } from './dtos/requests/forgot-password.dto';
