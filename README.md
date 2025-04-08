@@ -4,6 +4,7 @@
 ![TypeScript](https://img.shields.io/badge/TypeScript-4.x-blue.svg)
 ![TypeORM](https://img.shields.io/badge/TypeORM-0.3.x-orange.svg)
 ![Swagger](https://img.shields.io/badge/Swagger-3.x-green.svg)
+![Kafka](https://img.shields.io/badge/Kafka-3.x-yellow.svg)
 
 A secure, robust user authentication and management microservice for the RExpense application. Built with NestJS, this service implements industry-standard security practices and provides a comprehensive set of user management features.
 
@@ -25,6 +26,12 @@ A secure, robust user authentication and management microservice for the RExpens
   - Profile management
   - Role-based access control
 
+- **Event Streaming with Kafka**
+  - Service-based topic architecture
+  - Standardized message format
+  - Cross-service communication
+  - Automatic case conversion for cross-language compatibility
+
 - **API Documentation**
   - Swagger UI for easy API exploration
   - Comprehensive request/response documentation
@@ -39,6 +46,7 @@ A secure, robust user authentication and management microservice for the RExpens
 - **Documentation**: Swagger
 - **Security**: Helmet, ThrottlerModule
 - **Validation**: class-validator
+- **Event Streaming**: Kafka with @nestjs/microservices
 
 ## Getting Started
 
@@ -47,6 +55,7 @@ A secure, robust user authentication and management microservice for the RExpens
 - Node.js (v16+)
 - npm or yarn
 - PostgreSQL
+- Kafka (for event streaming)
 
 ### Installation
 
@@ -83,6 +92,9 @@ DB_SYNCHRONIZE=true #false in prod
 #EMAIL SENDGRID
 SENDGRID_API_KEY=SENDGRID_API_KEY
 SENDGRID_FROM_EMAIL=SENDGRID_FROM_EMAIL
+
+# KAFKA
+KAFKA_BOOTSTRAP_SERVERS=localhost:9092
 ```
 
 4. Start the application
@@ -119,6 +131,56 @@ The API documentation is available at `/swagger` when the application is running
   - `PATCH /users/${id}` - Update user profile
   - `DELETE /users/${id}` - Soft delete user
   - `DELETE /users/${id}/hard-delete` - Hard delete user
+
+## Kafka Integration
+
+### Overview
+The service uses Kafka for event streaming to communicate with other microservices. It follows a service-based topic approach where each service has its dedicated topic.
+
+### Message Format
+All messages follow a standardized format:
+```typescript
+interface KafkaMessage<T> {
+  messageId: string;      // Unique identifier for the message
+  timestamp: string;      // ISO timestamp
+  version: string;        // Schema version
+  source: string;         // Originating service
+  type: string;           // Message type
+  payload: T;             // Actual data
+}
+```
+
+### Available Topics
+Topics are defined in `kafka.constants.ts`:
+- `USER_SERVICE = 'user_service_events'`: Events related to user operations
+- `TRANSACTION_SERVICE = 'transaction_service_events'`: Events related to transaction operations
+
+### Message Types
+- User-related message types:
+  - `USER_CREATED`: Emitted when a new user is registered
+  - `USER_UPDATED`: Emitted when a user profile is updated
+  - `USER_DELETED`: Emitted when a user is deleted
+
+### Using the Kafka Service
+The `KafkaService` provides methods to emit events:
+
+```typescript
+// Import the service and message types
+import { KafkaService } from 'src/kafka/kafka.service';
+import { MessageTypes } from 'src/kafka/kafka.constants';
+
+// Inject the service
+constructor(private readonly kafkaService: KafkaService) {}
+
+// Emit a message
+await this.kafkaService.emitMessage(MessageTypes.USER_CREATED, userData);
+```
+
+### Cross-Language Compatibility
+The service automatically converts messages between camelCase (TypeScript) and snake_case (Python) formats for better interoperability between different microservices:
+
+- Outgoing messages are converted to snake_case
+- Incoming messages are converted to camelCase
 
 ## Security Features
 
